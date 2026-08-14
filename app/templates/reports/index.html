@@ -25,19 +25,23 @@
   <div class="col-lg-6">
     <div class="card p-3">
       <h6 class="fw-bold">Top Selling Menu</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <thead><tr><th>Item</th><th>Qty</th><th>Revenue</th></tr></thead>
         <tbody>{% for name, qty, revenue in top_products %}<tr><td>{{ name }}</td><td>{{ qty }}</td><td>₱{{ '%.2f'|format(revenue) }}</td></tr>{% endfor %}</tbody>
       </table>
+</div>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card p-3">
       <h6 class="fw-bold">Payment Method Breakdown</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <thead><tr><th>Method</th><th>Total</th></tr></thead>
         <tbody>{% for method, total in payments_breakdown %}<tr><td>{{ method }}</td><td>₱{{ '%.2f'|format(total) }}</td></tr>{% endfor %}</tbody>
       </table>
+</div>
     </div>
   </div>
   <div class="col-lg-6">

@@ -15,6 +15,7 @@
   <a href="{{ url_for('reservations.list_reservations') }}" class="btn btn-sm {{ 'btn-sv' if not status else 'btn-outline-secondary' }}">All</a>
 </div>
 <div class="card p-3">
+<div class="table-responsive">
 <table class="table table-sm table-hover">
   <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Time</th><th>Pax</th><th>Event</th><th>Status</th></tr></thead>
   <tbody>
@@ -26,5 +27,6 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% endblock %}

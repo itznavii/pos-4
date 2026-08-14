@@ -3,18 +3,22 @@
 {% block content %}
 <h4 class="fw-bold mb-3">{{ sale.sale_number }} <span class="badge bg-secondary">{{ sale.status }}</span></h4>
 <div class="card p-3 mb-3">
-  <table class="table table-sm">
+  <div class="table-responsive">
+<table class="table table-sm">
     <tr><th>Date</th><td>{{ sale.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
     <tr><th>Customer</th><td>{{ sale.customer_name }}</td></tr>
     <tr><th>Cashier</th><td>{{ sale.cashier.username if sale.cashier else '' }}</td></tr>
     {% if sale.table %}<tr><th>Table</th><td>{{ sale.table.name }}</td></tr>{% endif %}
   </table>
 </div>
+</div>
 <div class="card p-3 mb-3">
-  <table class="table table-sm">
+  <div class="table-responsive">
+<table class="table table-sm">
     <thead><tr><th>Item</th><th>Qty</th><th>Amount</th></tr></thead>
     <tbody>{% for i in sale.items %}<tr><td>{{ i.product_name }}</td><td>{{ i.quantity }}</td><td>₱{{ '%.2f'|format(i.line_total) }}</td></tr>{% endfor %}</tbody>
   </table>
+</div>
   <div class="text-end">
     <div>Subtotal: ₱{{ '%.2f'|format(sale.subtotal) }}</div>
     <div>Discount: -₱{{ '%.2f'|format(sale.discount) }}</div>

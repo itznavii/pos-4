@@ -10,9 +10,11 @@
 </form>
 </div>
 <div class="card p-3">
+<div class="table-responsive">
 <table class="table table-sm">
   <thead><tr><th>Name</th><th>Contact</th></tr></thead>
   <tbody>{% for s in items %}<tr><td>{{ s.name }}</td><td>{{ s.contact }}</td></tr>{% endfor %}</tbody>
 </table>
+</div>
 </div>
 {% endblock %}

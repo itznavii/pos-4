@@ -59,7 +59,8 @@
   <div class="col-lg-6">
     <div class="card p-3">
       <h6 class="fw-bold">Recent Transactions</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <thead><tr><th>#</th><th>Customer</th><th>Total</th><th>Time</th></tr></thead>
         <tbody>
           {% for s in recent_sales %}
@@ -67,12 +68,14 @@
           {% endfor %}
         </tbody>
       </table>
+</div>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card p-3">
       <h6 class="fw-bold">Upcoming Reservations</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <thead><tr><th>#</th><th>Customer</th><th>Date</th><th>Pax</th></tr></thead>
         <tbody>
           {% for r in upcoming_list %}
@@ -80,6 +83,7 @@
           {% endfor %}
         </tbody>
       </table>
+</div>
     </div>
   </div>
 </div>

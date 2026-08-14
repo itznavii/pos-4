@@ -22,7 +22,8 @@
   <div class="col-lg-7">
     <div class="card p-3 mb-3">
       <h6 class="fw-bold">Details</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <tr><th>Customer</th><td>{{ r.customer_name }}</td></tr>
         <tr><th>Phone</th><td>{{ r.phone }}</td></tr>
         <tr><th>Email</th><td>{{ r.email or '-' }}</td></tr>
@@ -36,6 +37,7 @@
         {% if r.actual_pax %}<tr><th>Actual Guests</th><td>{{ r.actual_pax }}</td></tr>{% endif %}
         {% if r.total_bill %}<tr><th>Total Bill</th><td>₱{{ '%.2f'|format(r.total_bill) }}</td></tr>{% endif %}
       </table>
+</div>
     </div>
 
     <div class="card p-3">
@@ -53,7 +55,8 @@
   <div class="col-lg-5">
     <div class="card p-3">
       <h6 class="fw-bold">Payments</h6>
-      <table class="table table-sm">
+      <div class="table-responsive">
+<table class="table table-sm">
         <thead><tr><th>Type</th><th>Amount</th><th>Method</th><th>Status</th>{% if current_user.is_admin() %}<th></th>{% endif %}</tr></thead>
         <tbody>
         {% for p in r.res_payments %}
@@ -72,6 +75,7 @@
         {% endfor %}
         </tbody>
       </table>
+</div>
       <p class="small text-muted">Total Down Payment: ₱{{ '%.2f'|format(r.down_payment) }}</p>
     </div>
   </div>
