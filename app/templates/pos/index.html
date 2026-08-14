@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}POS{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card p-3 mb-3">
+      <h6 class="fw-bold mb-3">Buffet Guest Count</h6>
+      {% if buffet_products|length > 1 %}
+      <div class="mb-3">
+        <label class="form-label small">Buffet Package</label>
+        <select id="buffetProductSelect" class="form-select"></select>
+      </div>
+      {% endif %}
+      <div id="tierRows"></div>
+      <div class="text-end fw-bold mt-2">Total Guests: <span id="totalPax">0</span></div>
+    </div>
+
+    <div class="card p-3">
+      <div class="d-flex justify-content-between mb-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="isWalkin">
+          <label class="form-check-label" for="isWalkin">Walk-in</label>
+        </div>
+        <select id="tableSelect" class="form-select form-select-sm" style="width:140px;">
+          <option value="">No Table</option>
+          {% for t in tables %}<option value="{{ t.id }}" {% if t.status != 'available' %}disabled{% endif %}>{{ t.name }} ({{ t.status }})</option>{% endfor %}
+        </select>
+      </div>
+      <input type="text" id="customerName" class="form-control form-control-sm" placeholder="Customer name (optional)">
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card p-3">
+      <h6 class="fw-bold">Bill Summary</h6>
+      <div class="mb-2">
+        <label class="form-label mb-0 small">Promo Discount (%)</label>
+        <input type="number" id="promoDiscount" class="form-control form-control-sm" value="0" min="0" max="100">
+      </div>
+      <div class="d-flex justify-content-between"><span>Subtotal</span><span id="subtotalDisplay">₱0.00</span></div>
+      <div class="d-flex justify-content-between text-danger"><span>Discount</span><span id="discountDisplay">-₱0.00</span></div>
+      <div class="d-flex justify-content-between"><span>VAT (12%)</span><span id="vatDisplay">₱0.00</span></div>
+      <div class="d-flex justify-content-between fw-bold fs-5"><span>Total</span><span id="totalDisplay">₱0.00</span></div>
+
+      <hr>
+      <h6 class="fw-bold">Payment</h6>
+      <div id="paymentRows"></div>
+      <button class="btn btn-sm btn-outline-secondary mb-2" onclick="addPaymentRow()"><i class="bi bi-plus"></i> Add Payment (split)</button>
+      <div class="d-flex justify-content-between"><span>Amount Tendered</span><span id="tenderedDisplay">₱0.00</span></div>
+      <div class="d-flex justify-content-between"><span>Balance/Change</span><span id="changeDisplay">₱0.00</span></div>
+
+      <button class="btn btn-sv w-100 mt-3" onclick="checkout()"><i class="bi bi-check-circle"></i> Complete Sale</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let buffetProducts = [];
+let currentProduct = null;
+const TIERS = ['adult', 'senior', 'pwd', 'kids', 'free'];
+const TIER_LABELS = { adult: 'Adult', senior: 'Senior Citizen', pwd: 'PWD', kids: 'Kids', free: 'Free (below height/age)' };
+
+function loadBuffetProducts() {
+  fetch("{{ url_for('pos.api_buffet_products') }}")
+    .then(r => r.json())
+    .then(data => {
+      buffetProducts = data;
+      if (buffetProducts.length === 0) {
+        document.getElementById('tierRows').innerHTML = '<p class="text-danger">No buffet package is set up yet. Ask an admin to add one in Menu Management.</p>';
+        return;
+      }
+      const select = document.getElementById('buffetProductSelect');
+      if (select) {
+        select.innerHTML = buffetProducts.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        select.addEventListener('change', () => selectProduct(select.value));
+      }
+      selectProduct(buffetProducts[0].id);
+    });
+}
+
+function selectProduct(id) {
+  currentProduct = buffetProducts.find(p => p.id == id);
+  renderTierRows();
+}
+
+function renderTierRows() {
+  const el = document.getElementById('tierRows');
+  if (!currentProduct) { el.innerHTML = ''; return; }
+  const t = currentProduct.buffet_tiers;
+  el.innerHTML = TIERS.map(tier => `
+    <div class="row mb-2 align-items-center">
+      <div class="col-7">${TIER_LABELS[tier]} <span class="text-muted small">(₱${(t[tier]||0).toFixed(2)})</span></div>
+      <div class="col-5">
+        <input type="number" min="0" value="0" class="form-control form-control-sm tier-input" id="tier_${tier}" oninput="recalc()">
+      </div>
+    </div>`).join('');
+  recalc();
+}
+
+function getCounts() {
+  const counts = {};
+  TIERS.forEach(t => {
+    const input = document.getElementById('tier_' + t);
+    counts[t] = input ? Math.max(0, parseInt(input.value || 0)) : 0;
+  });
+  return counts;
+}
+
+function computeTotals() {
+  if (!currentProduct) return { subtotal: 0, totalDiscount: 0, vat: 0, total: 0, totalPax: 0 };
+  const counts = getCounts();
+  const t = currentProduct.buffet_tiers;
+  const subtotal = TIERS.reduce((sum, tier) => sum + counts[tier] * (t[tier] || 0), 0);
+  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0);
+  const promoPct = parseFloat(document.getElementById('promoDiscount').value || 0);
+  const totalDiscount = subtotal * (promoPct / 100);
+  const taxable = Math.max(0, subtotal - totalDiscount);
+  const vat = taxable * 0.12;
+  const total = taxable + vat;
+  return { subtotal, totalDiscount, vat, total, totalPax };
+}
+
+function recalc() {
+  const t = computeTotals();
+  document.getElementById('totalPax').innerText = t.totalPax;
+  document.getElementById('subtotalDisplay').innerText = '₱' + t.subtotal.toFixed(2);
+  document.getElementById('discountDisplay').innerText = '-₱' + t.totalDiscount.toFixed(2);
+  document.getElementById('vatDisplay').innerText = '₱' + t.vat.toFixed(2);
+  document.getElementById('totalDisplay').innerText = '₱' + t.total.toFixed(2);
+  recalcPayments();
+}
+document.getElementById('promoDiscount').addEventListener('input', recalc);
+
+let paymentRowCount = 0;
+function addPaymentRow() {
+  paymentRowCount++;
+  const id = paymentRowCount;
+  const div = document.createElement('div');
+  div.className = 'input-group input-group-sm mb-1';
+  div.id = 'payrow_' + id;
+  div.innerHTML = `
+    <select class="form-select" id="paymethod_${id}">
+      <option>Cash</option><option>GCash</option><option>Bank Transfer</option><option>Credit Card</option>
+    </select>
+    <input type="number" class="form-control" placeholder="Amount" id="payamount_${id}" oninput="recalcPayments()">
+    <input type="text" class="form-control" placeholder="Ref #" id="payref_${id}">
+    <button class="btn btn-outline-danger" onclick="document.getElementById('payrow_${id}').remove(); recalcPayments();">&times;</button>
+  `;
+  document.getElementById('paymentRows').appendChild(div);
+}
+addPaymentRow();
+
+function getPayments() {
+  const rows = document.querySelectorAll('#paymentRows > div');
+  const payments = [];
+  rows.forEach(row => {
+    const id = row.id.split('_')[1];
+    const amount = parseFloat(document.getElementById('payamount_' + id).value || 0);
+    if (amount > 0) {
+      payments.push({
+        method: document.getElementById('paymethod_' + id).value,
+        amount: amount,
+        reference_number: document.getElementById('payref_' + id).value
+      });
+    }
+  });
+  return payments;
+}
+
+function recalcPayments() {
+  const payments = getPayments();
+  const tendered = payments.reduce((a, p) => a + p.amount, 0);
+  const t = computeTotals();
+  document.getElementById('tenderedDisplay').innerText = '₱' + tendered.toFixed(2);
+  document.getElementById('changeDisplay').innerText = '₱' + Math.max(0, tendered - t.total).toFixed(2);
+}
+
+function checkout() {
+  if (!currentProduct) { alert('No buffet package selected.'); return; }
+  const counts = getCounts();
+  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0);
+  if (totalPax <= 0) { alert('Enter at least 1 guest.'); return; }
+
+  const payload = {
+    product_id: currentProduct.id,
+    adult: counts.adult, senior: counts.senior, pwd: counts.pwd, kids: counts.kids, free: counts.free,
+    promo_discount_percent: parseFloat(document.getElementById('promoDiscount').value || 0),
+    payments: getPayments(),
+    is_walkin: document.getElementById('isWalkin').checked,
+    table_id: document.getElementById('tableSelect').value || null,
+    customer_name: document.getElementById('customerName').value
+  };
+  fetch("{{ url_for('pos.checkout') }}", {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(r => r.json()).then(res => {
+    if (res.error) { alert(res.error); return; }
+    if (res.requires_approval) {
+      alert(`Sale ${res.sale_number} needs admin approval (large discount). It's on hold.`);
+    } else {
+      window.location.href = `/pos/receipt/${res.sale_id}`;
+    }
+    TIERS.forEach(t => { const i = document.getElementById('tier_' + t); if (i) i.value = 0; });
+    document.getElementById('paymentRows').innerHTML = ''; addPaymentRow();
+    recalc();
+  }).catch(() => alert('Checkout failed. Please try again.'));
+}
+
+loadBuffetProducts();
+</script>
+{% endblock %}
