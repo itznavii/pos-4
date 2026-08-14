@@ -23,6 +23,16 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     csrf.init_app(app)
 
+    with app.app_context():
+        try:
+            from app.seed_data import run_seed
+            run_seed()
+        except Exception as e:
+            # Don't crash the whole app if the DB isn't reachable yet at boot -
+            # the error pages / logs will still show what's wrong on first request.
+            app.logger.error(f"Startup seeding failed: {e}")
+            db.session.rollback()
+
     from app.auth.routes import auth
     from app.main.routes import main
     from app.pos.routes import pos
