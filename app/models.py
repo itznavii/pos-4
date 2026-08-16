@@ -121,11 +121,23 @@ class Sale(db.Model):
     payments = db.relationship(
         "SalePayment", backref="sale", lazy=True, cascade="all, delete-orphan"
     )
+    attachments = db.relationship(
+        "SaleAttachment", backref="sale", lazy=True, cascade="all, delete-orphan"
+    )
     cashier = db.relationship("User", foreign_keys=[cashier_id])
     reservation = db.relationship("Reservation", foreign_keys=[reservation_id])
 
     def total_paid(self):
         return sum(p.amount for p in self.payments)
+
+
+class SaleAttachment(db.Model):
+    """Proof-of-payment file (screenshot/receipt) attached to a sale."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey("sale.id"))
+    filename = db.Column(db.String(255))
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class SaleItem(db.Model):

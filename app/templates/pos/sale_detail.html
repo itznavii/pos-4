@@ -25,5 +25,17 @@
     <div class="fw-bold fs-5">Total: ₱{{ '%.2f'|format(sale.total) }}</div>
   </div>
 </div>
+<div class="card p-3 mb-3">
+  <h6 class="fw-bold">Payments</h6>
+  {% for p in sale.payments %}
+    <div>{{ p.method }}: ₱{{ '%.2f'|format(p.amount) }}{% if p.reference_number %} (Ref: {{ p.reference_number }}){% endif %}</div>
+  {% else %}<p class="text-muted mb-0">No payments recorded.</p>{% endfor %}
+</div>
+<div class="card p-3 mb-3">
+  <h6 class="fw-bold">Proof of Payment</h6>
+  {% for a in sale.attachments %}
+    <div class="mb-1"><a href="{{ url_for('static', filename='uploads/'+a.filename) }}" target="_blank"><i class="bi bi-paperclip"></i> {{ a.filename.split('_',1)[-1] }}</a></div>
+  {% else %}<p class="text-muted mb-0">No file attached.</p>{% endfor %}
+</div>
 <a href="{{ url_for('pos.receipt', sale_id=sale.id) }}" class="btn btn-sv">Download Receipt PDF</a>
 {% endblock %}

@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from flask import Blueprint, render_template, request, jsonify, send_file, abort, flash, redirect, url_for
 from flask_login import login_required, current_user
@@ -10,6 +11,7 @@ from app.models import (
     Sale,
     SaleItem,
     SalePayment,
+    SaleAttachment,
     RestaurantTable,
     Customer,
     InventoryTransaction,
@@ -21,13 +23,14 @@ from app.utils import (
     deduct_inventory_for_sale_item,
     check_low_stock_and_notify,
     generate_receipt_pdf,
+    save_upload,
 )
 from app.notifications.helpers import notify
 
 pos = Blueprint("pos", __name__)
 
 SENIOR_PWD_RATE = 0.20
-METHODS_REQUIRING_REFERENCE = {"gcash", "bank transfer"}
+METHODS_REQUIRING_REFERENCE = {"gcash"}
 
 
 @pos.route("/")
@@ -69,7 +72,16 @@ def api_next_queue():
 @login_required
 @csrf.exempt
 def checkout():
-    data = request.get_json(force=True)
+    # Accepts multipart/form-data (or regular form-encoded) so a
+    # proof-of-payment file can be attached: field "payload" holds the
+    # JSON-encoded sale data, field "proof_file" holds the optional/required
+    # attachment. Falls back to a plain JSON body (no file) for compatibility.
+    if "payload" in request.form:
+        data = json.loads(request.form.get("payload", "{}"))
+        proof_file = request.files.get("proof_file")
+    else:
+        data = request.get_json(force=True)
+        proof_file = None
 
     product = Product.query.filter_by(id=data.get("product_id"), is_buffet=True).first()
     if not product:
@@ -129,13 +141,26 @@ def checkout():
     if not payments or amount_tendered <= 0:
         return jsonify({"error": "Please enter at least one payment before completing the sale."}), 400
 
+    needs_proof = False
     for p in payments:
         method = (p.get("method") or "").strip()
-        if method.lower() in METHODS_REQUIRING_REFERENCE and not (p.get("reference_number") or "").strip():
-            return jsonify({"error": f"A reference number is required for {method} payments."}), 400
+        if method.lower() in METHODS_REQUIRING_REFERENCE:
+            if not (p.get("reference_number") or "").strip():
+                return jsonify({"error": f"A reference number is required for {method} payments."}), 400
+            needs_proof = True
+
+    if needs_proof and not (proof_file and proof_file.filename):
+        return jsonify({"error": "Please attach proof of payment (screenshot/receipt) for GCash payments."}), 400
 
     if amount_tendered + 0.01 < total:
         return jsonify({"error": f"Payment (₱{amount_tendered:.2f}) is less than the total bill (₱{total:.2f})."}), 400
+
+    attachment_filename = None
+    if proof_file and proof_file.filename:
+        try:
+            attachment_filename = save_upload(proof_file, subfolder="sales")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
 
     is_walkin = bool(data.get("is_walkin", False))
     table_id = data.get("table_id") or None
@@ -182,6 +207,9 @@ def checkout():
                 reference_number=p.get("reference_number"),
             )
         )
+
+    if attachment_filename:
+        db.session.add(SaleAttachment(sale_id=sale.id, filename=attachment_filename))
 
     if table_id:
         table = RestaurantTable.query.get(table_id)
