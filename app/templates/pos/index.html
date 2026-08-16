@@ -12,6 +12,8 @@
       </div>
       {% endif %}
       <div id="tierRows"></div>
+      <hr class="my-2">
+      <div id="freeRows"></div>
       <div class="text-end fw-bold mt-2">Total Guests: <span id="totalPax">0</span></div>
     </div>
 
@@ -39,15 +41,15 @@
       </div>
       <div class="d-flex justify-content-between"><span>Subtotal</span><span id="subtotalDisplay">₱0.00</span></div>
       <div class="d-flex justify-content-between text-danger"><span>Discount</span><span id="discountDisplay">-₱0.00</span></div>
-      <div class="d-flex justify-content-between"><span>VAT (12%)</span><span id="vatDisplay">₱0.00</span></div>
       <div class="d-flex justify-content-between fw-bold fs-5"><span>Total</span><span id="totalDisplay">₱0.00</span></div>
 
       <hr>
-      <h6 class="fw-bold">Payment</h6>
+      <h6 class="fw-bold">Payment <span class="text-danger">*</span></h6>
       <div id="paymentRows"></div>
       <button class="btn btn-sm btn-outline-secondary mb-2" onclick="addPaymentRow()"><i class="bi bi-plus"></i> Add Payment (split)</button>
       <div class="d-flex justify-content-between"><span>Amount Tendered</span><span id="tenderedDisplay">₱0.00</span></div>
       <div class="d-flex justify-content-between"><span>Balance/Change</span><span id="changeDisplay">₱0.00</span></div>
+      <div class="form-text text-muted small mb-2">GCash and Bank Transfer payments require a reference number. At least one payment covering the full total is required to complete the sale.</div>
 
       <button class="btn btn-sv w-100 mt-3" onclick="checkout()"><i class="bi bi-check-circle"></i> Complete Sale</button>
     </div>
@@ -59,8 +61,13 @@
 <script>
 let buffetProducts = [];
 let currentProduct = null;
-const TIERS = ['adult', 'senior', 'pwd', 'kids', 'free'];
-const TIER_LABELS = { adult: 'Adult', senior: 'Senior Citizen', pwd: 'PWD', kids: 'Kids', free: 'Free (below height/age)' };
+// Priced guest types (pulled from the buffet product's tier prices)
+const TIERS = ['adult', 'senior', 'pwd', 'kids'];
+const TIER_LABELS = { adult: 'Adult', senior: 'Senior Citizen', pwd: 'PWD', kids: 'Kids' };
+// Free-of-charge guest types — always ₱0.00, but tracked separately so
+// reports can show how many were "below 3 ft" vs "birthday celebrant".
+const FREE_TYPES = ['free_below3ft', 'free_birthday'];
+const FREE_LABELS = { free_below3ft: 'Kids below 3 ft', free_birthday: 'Birthday Celebrant' };
 
 function loadBuffetProducts() {
   fetch("{{ url_for('pos.api_buffet_products') }}")
@@ -87,13 +94,21 @@ function selectProduct(id) {
 
 function renderTierRows() {
   const el = document.getElementById('tierRows');
-  if (!currentProduct) { el.innerHTML = ''; return; }
+  const freeEl = document.getElementById('freeRows');
+  if (!currentProduct) { el.innerHTML = ''; freeEl.innerHTML = ''; return; }
   const t = currentProduct.buffet_tiers;
   el.innerHTML = TIERS.map(tier => `
     <div class="row mb-2 align-items-center">
       <div class="col-7">${TIER_LABELS[tier]} <span class="text-muted small">(₱${(t[tier]||0).toFixed(2)})</span></div>
       <div class="col-5">
         <input type="number" min="0" value="0" class="form-control form-control-sm tier-input" id="tier_${tier}" oninput="recalc()">
+      </div>
+    </div>`).join('');
+  freeEl.innerHTML = FREE_TYPES.map(ft => `
+    <div class="row mb-2 align-items-center">
+      <div class="col-7">${FREE_LABELS[ft]} <span class="text-muted small">(₱0.00)</span></div>
+      <div class="col-5">
+        <input type="number" min="0" value="0" class="form-control form-control-sm tier-input" id="free_${ft}" oninput="recalc()">
       </div>
     </div>`).join('');
   recalc();
@@ -105,21 +120,25 @@ function getCounts() {
     const input = document.getElementById('tier_' + t);
     counts[t] = input ? Math.max(0, parseInt(input.value || 0)) : 0;
   });
+  let free = 0;
+  FREE_TYPES.forEach(ft => {
+    const input = document.getElementById('free_' + ft);
+    free += input ? Math.max(0, parseInt(input.value || 0)) : 0;
+  });
+  counts.free = free;
   return counts;
 }
 
 function computeTotals() {
-  if (!currentProduct) return { subtotal: 0, totalDiscount: 0, vat: 0, total: 0, totalPax: 0 };
+  if (!currentProduct) return { subtotal: 0, totalDiscount: 0, total: 0, totalPax: 0 };
   const counts = getCounts();
   const t = currentProduct.buffet_tiers;
   const subtotal = TIERS.reduce((sum, tier) => sum + counts[tier] * (t[tier] || 0), 0);
-  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0);
+  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0) + counts.free;
   const promoPct = parseFloat(document.getElementById('promoDiscount').value || 0);
   const totalDiscount = subtotal * (promoPct / 100);
-  const taxable = Math.max(0, subtotal - totalDiscount);
-  const vat = taxable * 0.12;
-  const total = taxable + vat;
-  return { subtotal, totalDiscount, vat, total, totalPax };
+  const total = Math.max(0, subtotal - totalDiscount);
+  return { subtotal, totalDiscount, total, totalPax };
 }
 
 function recalc() {
@@ -127,12 +146,12 @@ function recalc() {
   document.getElementById('totalPax').innerText = t.totalPax;
   document.getElementById('subtotalDisplay').innerText = '₱' + t.subtotal.toFixed(2);
   document.getElementById('discountDisplay').innerText = '-₱' + t.totalDiscount.toFixed(2);
-  document.getElementById('vatDisplay').innerText = '₱' + t.vat.toFixed(2);
   document.getElementById('totalDisplay').innerText = '₱' + t.total.toFixed(2);
   recalcPayments();
 }
 document.getElementById('promoDiscount').addEventListener('input', recalc);
 
+const REQUIRES_REFERENCE = ['GCash', 'Bank Transfer'];
 let paymentRowCount = 0;
 function addPaymentRow() {
   paymentRowCount++;
@@ -141,7 +160,7 @@ function addPaymentRow() {
   div.className = 'input-group input-group-sm mb-1';
   div.id = 'payrow_' + id;
   div.innerHTML = `
-    <select class="form-select" id="paymethod_${id}">
+    <select class="form-select" id="paymethod_${id}" onchange="toggleRefRequired(${id})">
       <option>Cash</option><option>GCash</option><option>Bank Transfer</option><option>Credit Card</option>
     </select>
     <input type="number" class="form-control" placeholder="Amount" id="payamount_${id}" oninput="recalcPayments()">
@@ -151,6 +170,18 @@ function addPaymentRow() {
   document.getElementById('paymentRows').appendChild(div);
 }
 addPaymentRow();
+
+function toggleRefRequired(id) {
+  const method = document.getElementById('paymethod_' + id).value;
+  const refInput = document.getElementById('payref_' + id);
+  if (REQUIRES_REFERENCE.includes(method)) {
+    refInput.placeholder = 'Ref # (required)';
+    refInput.classList.add('border-warning');
+  } else {
+    refInput.placeholder = 'Ref #';
+    refInput.classList.remove('border-warning');
+  }
+}
 
 function getPayments() {
   const rows = document.querySelectorAll('#paymentRows > div');
@@ -162,7 +193,7 @@ function getPayments() {
       payments.push({
         method: document.getElementById('paymethod_' + id).value,
         amount: amount,
-        reference_number: document.getElementById('payref_' + id).value
+        reference_number: document.getElementById('payref_' + id).value.trim()
       });
     }
   });
@@ -180,14 +211,33 @@ function recalcPayments() {
 function checkout() {
   if (!currentProduct) { alert('No buffet package selected.'); return; }
   const counts = getCounts();
-  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0);
+  const totalPax = TIERS.reduce((sum, tier) => sum + counts[tier], 0) + counts.free;
   if (totalPax <= 0) { alert('Enter at least 1 guest.'); return; }
+
+  const payments = getPayments();
+  const t = computeTotals();
+  const tendered = payments.reduce((a, p) => a + p.amount, 0);
+
+  if (payments.length === 0 || tendered <= 0) {
+    alert('Please enter at least one payment before completing the sale.');
+    return;
+  }
+  for (const p of payments) {
+    if (REQUIRES_REFERENCE.includes(p.method) && !p.reference_number) {
+      alert(`A reference number is required for ${p.method} payments.`);
+      return;
+    }
+  }
+  if (tendered + 0.01 < t.total) {
+    alert(`Payment (₱${tendered.toFixed(2)}) is less than the total bill (₱${t.total.toFixed(2)}).`);
+    return;
+  }
 
   const payload = {
     product_id: currentProduct.id,
     adult: counts.adult, senior: counts.senior, pwd: counts.pwd, kids: counts.kids, free: counts.free,
     promo_discount_percent: parseFloat(document.getElementById('promoDiscount').value || 0),
-    payments: getPayments(),
+    payments: payments,
     is_walkin: document.getElementById('isWalkin').checked,
     table_id: document.getElementById('tableSelect').value || null,
     customer_name: document.getElementById('customerName').value
@@ -203,7 +253,8 @@ function checkout() {
     } else {
       window.location.href = `/pos/receipt/${res.sale_id}`;
     }
-    TIERS.forEach(t => { const i = document.getElementById('tier_' + t); if (i) i.value = 0; });
+    TIERS.forEach(tr => { const i = document.getElementById('tier_' + tr); if (i) i.value = 0; });
+    FREE_TYPES.forEach(ft => { const i = document.getElementById('free_' + ft); if (i) i.value = 0; });
     document.getElementById('paymentRows').innerHTML = ''; addPaymentRow();
     recalc();
   }).catch(() => alert('Checkout failed. Please try again.'));

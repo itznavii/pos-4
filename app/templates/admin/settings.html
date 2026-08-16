@@ -6,8 +6,6 @@
 <form method="POST">
   <label class="form-label">Restaurant Name</label>
   <input type="text" name="restaurant_name" class="form-control mb-2" value="{{ settings.get('restaurant_name', 'Sitio Verde Buffet Restaurant') }}">
-  <label class="form-label">VAT Rate (%)</label>
-  <input type="number" step="0.01" name="vat_rate" class="form-control mb-2" value="{{ settings.get('vat_rate', '12') }}">
   <label class="form-label">Receipt Footer Message</label>
   <input type="text" name="receipt_footer" class="form-control mb-2" value="{{ settings.get('receipt_footer', 'Thank you for dining with us!') }}">
   <button class="btn btn-sv">Save Settings</button>

@@ -1,6 +1,7 @@
 """Idempotent database seeding logic — safe to call on every app startup.
-Only creates rows that don't already exist, so it never overwrites or
-duplicates data on repeat runs.
+Only creates rows that don't already exist (except buffet tier prices, which
+are always kept in sync with PRICE_TABLE below so a code update updates
+prices on your live database too, without needing a manual re-seed).
 """
 from werkzeug.security import generate_password_hash
 
@@ -15,6 +16,16 @@ from app.models import (
     Supplier,
     Setting,
 )
+
+# Buffet price per guest type. Edit here to change pricing; it will apply
+# automatically the next time the app starts (no manual DB edit needed).
+PRICE_TABLE = {
+    "adult": 599.00,
+    "senior": 479.20,
+    "pwd": 479.20,
+    "kids": 449.00,
+    "free": 0.00,  # covers both "kids below 3 ft" and "birthday celebrant"
+}
 
 
 def run_seed():
@@ -58,15 +69,15 @@ def run_seed():
         db.session.add(buffet)
         db.session.commit()
 
-        db.session.add_all(
-            [
-                BuffetTier(product_id=buffet.id, tier="adult", price=600),
-                BuffetTier(product_id=buffet.id, tier="senior", price=480),
-                BuffetTier(product_id=buffet.id, tier="pwd", price=480),
-                BuffetTier(product_id=buffet.id, tier="kids", price=300),
-                BuffetTier(product_id=buffet.id, tier="free", price=0),
-            ]
-        )
+        for tier, price in PRICE_TABLE.items():
+            db.session.add(BuffetTier(product_id=buffet.id, tier=tier, price=price))
+
+    # Always keep existing buffet tier prices in sync with PRICE_TABLE, even
+    # if the product/tiers were created in an earlier deploy.
+    for product in Product.query.filter_by(is_buffet=True).all():
+        for tier in product.buffet_tiers:
+            if tier.tier in PRICE_TABLE and tier.price != PRICE_TABLE[tier.tier]:
+                tier.price = PRICE_TABLE[tier.tier]
 
     if not RestaurantTable.query.first():
         for i in range(1, 9):
@@ -74,7 +85,6 @@ def run_seed():
 
     if not Setting.query.filter_by(key="restaurant_name").first():
         db.session.add(Setting(key="restaurant_name", value="Sitio Verde Buffet Restaurant"))
-        db.session.add(Setting(key="vat_rate", value="12"))
         db.session.add(Setting(key="receipt_footer", value="Thank you for dining with us!"))
 
     db.session.commit()

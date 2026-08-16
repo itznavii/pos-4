@@ -25,6 +25,5 @@ class Config:
     ALLOWED_UPLOAD_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf", "webp"}
 
     # Business rules
-    VAT_RATE = 0.12
     SENIOR_PWD_DISCOUNT_RATE = 0.20
     LARGE_DISCOUNT_APPROVAL_THRESHOLD = 1000.0  # PHP - flags for admin approval

@@ -25,8 +25,6 @@ from app.notifications.helpers import notify
 
 reservations = Blueprint("reservations", __name__)
 
-VAT_RATE = 0.12
-
 
 @reservations.route("/")
 @login_required
@@ -245,6 +243,11 @@ def final_billing(id):
 
         payment_method = request.form.get("payment_method", "Cash")
         amount_paid = float(request.form.get("amount_paid", 0) or 0)
+        reference_number = (request.form.get("reference_number") or "").strip()
+
+        if payment_method.lower() in ("gcash", "bank transfer") and not reference_number:
+            flash(f"A reference number is required for {payment_method} payments.", "danger")
+            return redirect(url_for("reservations.final_billing", id=id))
 
         if amount_paid + 0.01 < remaining:
             flash(
@@ -270,8 +273,7 @@ def final_billing(id):
         )
 
         # Build a Sale record so it flows into reports/receipt like any other transaction
-        subtotal = round(total_bill / (1 + VAT_RATE), 2)
-        vat = round(total_bill - subtotal, 2)
+        subtotal = total_bill
         sale = Sale(
             sale_number=new_sale_number(),
             customer_id=r.customer_id,
@@ -281,7 +283,7 @@ def final_billing(id):
             subtotal=subtotal,
             discount=0,
             discount_type="none",
-            vat=vat,
+            vat=0,
             total=total_bill,
             amount_tendered=verified_dp + amount_paid,
             change=max(0.0, (verified_dp + amount_paid) - total_bill),

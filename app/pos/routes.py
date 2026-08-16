@@ -26,8 +26,8 @@ from app.notifications.helpers import notify
 
 pos = Blueprint("pos", __name__)
 
-VAT_RATE = 0.12
 SENIOR_PWD_RATE = 0.20
+METHODS_REQUIRING_REFERENCE = {"gcash", "bank transfer"}
 
 
 @pos.route("/")
@@ -121,11 +121,21 @@ def checkout():
 
     total_discount = promo_amount
     taxable = max(0.0, subtotal - total_discount)
-    vat = round(taxable * VAT_RATE, 2)
-    total = round(taxable + vat, 2)
+    total = round(taxable, 2)
 
     payments = data.get("payments", [])
     amount_tendered = sum(float(p.get("amount", 0) or 0) for p in payments)
+
+    if not payments or amount_tendered <= 0:
+        return jsonify({"error": "Please enter at least one payment before completing the sale."}), 400
+
+    for p in payments:
+        method = (p.get("method") or "").strip()
+        if method.lower() in METHODS_REQUIRING_REFERENCE and not (p.get("reference_number") or "").strip():
+            return jsonify({"error": f"A reference number is required for {method} payments."}), 400
+
+    if amount_tendered + 0.01 < total:
+        return jsonify({"error": f"Payment (₱{amount_tendered:.2f}) is less than the total bill (₱{total:.2f})."}), 400
 
     is_walkin = bool(data.get("is_walkin", False))
     table_id = data.get("table_id") or None
@@ -146,7 +156,7 @@ def checkout():
         subtotal=round(subtotal, 2),
         discount=round(total_discount + buffet_informational_discount, 2),
         discount_type="promo" if total_discount else "none",
-        vat=vat,
+        vat=0,
         total=total,
         amount_tendered=amount_tendered,
         change=max(0.0, round(amount_tendered - total, 2)),

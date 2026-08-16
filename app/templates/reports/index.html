@@ -15,10 +15,36 @@
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-md-3"><div class="card card-stat p-3"><small class="text-muted">Total Sales</small><h4>₱{{ '%.2f'|format(total_sales) }}</h4></div></div>
-  <div class="col-md-3"><div class="card card-stat p-3"><small class="text-muted">Transactions</small><h4>{{ transaction_count }}</h4></div></div>
-  <div class="col-md-3"><div class="card card-stat p-3"><small class="text-muted">Total VAT</small><h4>₱{{ '%.2f'|format(total_vat) }}</h4></div></div>
-  <div class="col-md-3"><div class="card card-stat p-3" style="border-left-color:#c0392b"><small class="text-muted">Net (Sales - Expenses)</small><h4>₱{{ '%.2f'|format(net) }}</h4></div></div>
+  <div class="col-md-4"><div class="card card-stat p-3"><small class="text-muted">Total Sales</small><h4>₱{{ '%.2f'|format(total_sales) }}</h4></div></div>
+  <div class="col-md-4"><div class="card card-stat p-3"><small class="text-muted">Transactions</small><h4>{{ transaction_count }}</h4></div></div>
+  <div class="col-md-4"><div class="card card-stat p-3" style="border-left-color:#c0392b"><small class="text-muted">Net (Sales - Expenses)</small><h4>₱{{ '%.2f'|format(net) }}</h4></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="card card-stat p-3"><small class="text-muted">Total Pax Today</small><h4>{{ quick_pax.today }}</h4></div></div>
+  <div class="col-md-4"><div class="card card-stat p-3"><small class="text-muted">Total Pax This Week</small><h4>{{ quick_pax.this_week }}</h4></div></div>
+  <div class="col-md-4"><div class="card card-stat p-3"><small class="text-muted">Total Pax Last Month</small><h4>{{ quick_pax.last_month }}</h4></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card p-3">
+      <h6 class="fw-bold">Guest Breakdown — {{ start }} to {{ end }}</h6>
+      <div class="table-responsive">
+<table class="table table-sm">
+        <thead><tr><th>Guest Type</th><th>Pax</th><th>% Share</th></tr></thead>
+        <tbody>
+          <tr><td>Adult</td><td>{{ pax.adult }}</td><td>{{ pax.pct.adult }}%</td></tr>
+          <tr><td>Senior Citizen</td><td>{{ pax.senior }}</td><td>{{ pax.pct.senior }}%</td></tr>
+          <tr><td>PWD</td><td>{{ pax.pwd }}</td><td>{{ pax.pct.pwd }}%</td></tr>
+          <tr><td>Kids</td><td>{{ pax.kids }}</td><td>{{ pax.pct.kids }}%</td></tr>
+          <tr><td>Free of Charge (below 3 ft or birthday)</td><td>{{ pax.free }}</td><td>{{ pax.pct.free }}%</td></tr>
+          <tr class="fw-bold"><td>Total</td><td>{{ pax.total }}</td><td>100%</td></tr>
+        </tbody>
+      </table>
+</div>
+    </div>
+  </div>
 </div>
 
 <div class="row g-3">

@@ -200,8 +200,6 @@ def generate_receipt_pdf(sale, restaurant_name="Sitio Verde Buffet Restaurant"):
     if sale.discount:
         p.drawString(5 * mm, y, f"Discount ({sale.discount_type}): -PHP {sale.discount:.2f}")
         y -= 4 * mm
-    p.drawString(5 * mm, y, f"VAT (12%): PHP {sale.vat:.2f}")
-    y -= 4 * mm
     if sale.reservation_id and sale.reservation and sale.reservation.down_payment:
         p.drawString(5 * mm, y, f"Less Down Payment: -PHP {sale.reservation.down_payment:.2f}")
         y -= 4 * mm

@@ -47,7 +47,6 @@ def index():
 
     total_sales = sum(s.total for s in sales)
     total_discount = sum(s.discount for s in sales)
-    total_vat = sum(s.vat for s in sales)
     transaction_count = len(sales)
 
     top_products = (
@@ -73,6 +72,9 @@ def index():
     expenses_in_range = Expense.query.filter(Expense.date >= start, Expense.date <= end).all()
     total_expenses = sum(e.amount or 0 for e in expenses_in_range)
 
+    pax = _pax_breakdown(start, end)
+    quick_pax = _quick_pax_stats()
+
     return render_template(
         "reports/index.html",
         period=period,
@@ -81,7 +83,6 @@ def index():
         sales=sales,
         total_sales=total_sales,
         total_discount=total_discount,
-        total_vat=total_vat,
         transaction_count=transaction_count,
         top_products=top_products,
         payments_breakdown=payments_breakdown,
@@ -89,7 +90,71 @@ def index():
         expenses_in_range=expenses_in_range,
         total_expenses=total_expenses,
         net=total_sales - total_expenses,
+        pax=pax,
+        quick_pax=quick_pax,
     )
+
+
+def _pax_breakdown(start, end):
+    """Guest-type breakdown (Adult/Senior/PWD/Kids/Free) for buffet sale
+    items within the given date range, completed sales only."""
+    row = (
+        db.session.query(
+            func.coalesce(func.sum(SaleItem.buffet_adult), 0),
+            func.coalesce(func.sum(SaleItem.buffet_senior), 0),
+            func.coalesce(func.sum(SaleItem.buffet_pwd), 0),
+            func.coalesce(func.sum(SaleItem.buffet_kids), 0),
+            func.coalesce(func.sum(SaleItem.buffet_free), 0),
+        )
+        .join(Sale)
+        .filter(
+            func.date(Sale.created_at) >= start,
+            func.date(Sale.created_at) <= end,
+            Sale.status == "completed",
+            SaleItem.is_buffet.is_(True),
+        )
+        .first()
+    )
+    adult, senior, pwd, kids, free = row if row else (0, 0, 0, 0, 0)
+    total = adult + senior + pwd + kids + free
+
+    def pct(n):
+        return round((n / total) * 100, 1) if total else 0.0
+
+    return {
+        "adult": adult, "senior": senior, "pwd": pwd, "kids": kids, "free": free,
+        "total": total,
+        "pct": {"adult": pct(adult), "senior": pct(senior), "pwd": pct(pwd), "kids": pct(kids), "free": pct(free)},
+    }
+
+
+def _quick_pax_stats():
+    """Total pax served today, this week, and last month — independent of
+    the report period filter, for the always-visible summary row."""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    last_month_end = today.replace(day=1) - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+
+    def total_pax_between(d_start, d_end):
+        total = (
+            db.session.query(func.coalesce(func.sum(SaleItem.quantity), 0))
+            .join(Sale)
+            .filter(
+                func.date(Sale.created_at) >= d_start,
+                func.date(Sale.created_at) <= d_end,
+                Sale.status == "completed",
+                SaleItem.is_buffet.is_(True),
+            )
+            .scalar()
+        )
+        return total or 0
+
+    return {
+        "today": total_pax_between(today, today),
+        "this_week": total_pax_between(week_start, today),
+        "last_month": total_pax_between(last_month_start, last_month_end),
+    }
 
 
 @reports.route("/export/<fmt>")
@@ -104,7 +169,7 @@ def export(fmt):
     ).all()
 
     rows = [
-        ["Sale Number", "Date", "Customer", "Subtotal", "Discount", "VAT", "Total", "Cashier"]
+        ["Sale Number", "Date", "Customer", "Subtotal", "Discount", "Total", "Cashier"]
     ]
     for s in sales:
         rows.append(
@@ -114,7 +179,6 @@ def export(fmt):
                 s.customer_name,
                 f"{s.subtotal:.2f}",
                 f"{s.discount:.2f}",
-                f"{s.vat:.2f}",
                 f"{s.total:.2f}",
                 s.cashier.username if s.cashier else "",
             ]
