@@ -209,7 +209,11 @@ def generate_receipt_pdf(sale, restaurant_name="Sitio Verde Buffet Restaurant"):
     p.setFont("Helvetica", 8)
 
     for pay in sale.payments:
-        ref = f" ({pay.reference_number})" if pay.reference_number else ""
+        # A reference number only ever belongs to a non-cash payment (GCash,
+        # Bank Transfer, etc.) — if one is stored on a Cash row (e.g. a
+        # cashier typed something into the Ref # field before switching the
+        # method back to Cash), never print it.
+        ref = f" ({pay.reference_number})" if (pay.reference_number and pay.method != "Cash") else ""
         p.drawString(5 * mm, y, f"{pay.method}: PHP {pay.amount:.2f}{ref}")
         y -= 4 * mm
 

@@ -235,8 +235,12 @@ function toggleRefRequired(id) {
     refInput.placeholder = 'Ref # (required)';
     refInput.classList.add('border-warning');
   } else {
+    // Cash (and any other method that doesn't need one) never carries a
+    // reference number forward — clear it so a stray value typed in
+    // earlier can't end up printed on the receipt next to "Cash".
     refInput.placeholder = 'Ref #';
     refInput.classList.remove('border-warning');
+    refInput.value = '';
   }
   updateProofFileVisibility();
 }
@@ -261,11 +265,17 @@ function getPayments() {
   rows.forEach(row => {
     const id = row.id.split('_')[1];
     const amount = parseFloat(document.getElementById('payamount_' + id).value || 0);
+    const method = document.getElementById('paymethod_' + id).value;
     if (amount > 0) {
       payments.push({
-        method: document.getElementById('paymethod_' + id).value,
+        method: method,
         amount: amount,
-        reference_number: document.getElementById('payref_' + id).value.trim()
+        // Only send a reference number for methods that actually use one —
+        // Cash never carries one through, even if something was left in
+        // the field from before the method was switched.
+        reference_number: REQUIRES_REFERENCE.includes(method)
+          ? document.getElementById('payref_' + id).value.trim()
+          : ''
       });
     }
   });

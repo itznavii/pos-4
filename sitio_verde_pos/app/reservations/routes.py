@@ -314,7 +314,15 @@ def final_billing(id):
             )
         )
         db.session.add(
-            SalePayment(sale_id=sale.id, method=payment_method, amount=amount_paid, reference_number=request.form.get("reference_number"))
+            SalePayment(
+                sale_id=sale.id,
+                method=payment_method,
+                amount=amount_paid,
+                # A reference number only ever belongs to a non-cash payment —
+                # never persist one on a Cash row, or it prints on the
+                # receipt looking like a stray/garbled value.
+                reference_number=reference_number if payment_method.lower() != "cash" else None,
+            )
         )
         if verified_dp:
             db.session.add(SalePayment(sale_id=sale.id, method="Down Payment", amount=verified_dp))

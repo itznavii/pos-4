@@ -279,12 +279,19 @@ def checkout():
             deduct_inventory_for_sale_item(item, product_ref)
 
     for p in payments:
+        method = p.get("method", "Cash")
+        # Defense in depth: a reference number is only ever meaningful for a
+        # non-cash payment. Even if a raw API call (bypassing the UI) sends
+        # one alongside method=Cash, never persist it — it would otherwise
+        # print on the receipt next to "Cash" and look like a stray/garbled
+        # value.
+        ref = (p.get("reference_number") or "").strip() if method.lower() != "cash" else None
         db.session.add(
             SalePayment(
                 sale_id=sale.id,
-                method=p.get("method", "Cash"),
+                method=method,
                 amount=float(p.get("amount", 0) or 0),
-                reference_number=p.get("reference_number"),
+                reference_number=ref or None,
             )
         )
 
