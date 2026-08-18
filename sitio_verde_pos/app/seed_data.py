@@ -94,4 +94,18 @@ def run_seed():
         db.session.add(Setting(key="restaurant_name", value="Sitio Verde Buffet Restaurant"))
         db.session.add(Setting(key="receipt_footer", value="Thank you for dining with us!"))
 
+    # Default payment QR codes (QC/Marikina branch) — pre-loaded so the POS
+    # payment screen has something to show out of the box. Each can be
+    # replaced any time from Admin > Settings without touching this seed.
+    default_qr_settings = {
+        "payment_qr_gcash": ("payment_qr/gcash.jpg", "GCash - LA*****E S."),
+        "payment_qr_aub": ("payment_qr/aub_qc.jpg", "SitioVerde QC - AUB InstaPay"),
+        "payment_qr_psbank": ("payment_qr/psbank.jpg", "PSBank InstaPay - J S"),
+    }
+    for key, (path, label) in default_qr_settings.items():
+        if not Setting.query.filter_by(key=key).first():
+            db.session.add(Setting(key=key, value=path))
+        if not Setting.query.filter_by(key=f"{key}_label").first():
+            db.session.add(Setting(key=f"{key}_label", value=label))
+
     db.session.commit()

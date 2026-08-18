@@ -59,11 +59,16 @@
       <div class="d-flex justify-content-between"><span>Amount Tendered</span><span id="tenderedDisplay">₱0.00</span></div>
       <div class="d-flex justify-content-between"><span>Balance/Change</span><span id="changeDisplay">₱0.00</span></div>
 
+      <div id="qrCodePanel" class="mb-2 mt-2" style="display:none;">
+        <label class="form-label mb-1 small">Show customer this QR to scan and pay:</label>
+        <div id="qrCodeCards" class="d-flex flex-wrap gap-2"></div>
+      </div>
+
       <div class="mb-2 mt-2" id="proofFileWrap" style="display:none;">
         <label class="form-label mb-0 small">Attach Proof of Payment (screenshot/receipt) <span class="text-danger">*</span></label>
         <input type="file" id="proofFile" class="form-control form-control-sm" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf">
       </div>
-      <div class="form-text text-muted small mb-2">GCash payments require a reference number and an attached proof of payment. At least one payment covering the full total is required to complete the sale.</div>
+      <div class="form-text text-muted small mb-2">GCash and Bank Transfer payments require a reference number and an attached proof of payment. At least one payment covering the full total is required to complete the sale.</div>
 
       <button class="btn btn-sv w-100 mt-3" onclick="checkout()"><i class="bi bi-check-circle"></i> Complete Sale</button>
     </div>
@@ -208,7 +213,15 @@ document.getElementById('discountType').addEventListener('change', () => {
 });
 document.getElementById('discountValue').addEventListener('input', recalc);
 
-const REQUIRES_REFERENCE = ['GCash'];
+const REQUIRES_REFERENCE = ['GCash', 'Bank Transfer'];
+// Payment QR codes configured in Admin > Settings (QC/Marikina branch).
+// Filtered to whichever methods are currently selected across the payment
+// rows so the cashier can show the customer the right one to scan.
+const PAYMENT_QR_CODES = [
+  {% for qr in payment_qr_codes %}
+  { method: {{ qr.method | tojson }}, path: {{ qr.path | tojson }}, label: {{ qr.label | tojson }} },
+  {% endfor %}
+];
 let paymentRowCount = 0;
 function addPaymentRow() {
   paymentRowCount++;
@@ -222,11 +235,35 @@ function addPaymentRow() {
     </select>
     <input type="number" class="form-control" placeholder="Amount" id="payamount_${id}" oninput="recalcPayments()">
     <input type="text" class="form-control" placeholder="Ref #" id="payref_${id}">
-    <button class="btn btn-outline-danger" onclick="document.getElementById('payrow_${id}').remove(); recalcPayments(); updateProofFileVisibility();">&times;</button>
+    <button class="btn btn-outline-danger" onclick="document.getElementById('payrow_${id}').remove(); recalcPayments(); updateProofFileVisibility(); updateQrDisplay();">&times;</button>
   `;
   document.getElementById('paymentRows').appendChild(div);
 }
 addPaymentRow();
+
+function updateQrDisplay() {
+  const rows = document.querySelectorAll('#paymentRows > div');
+  const selectedMethods = new Set();
+  rows.forEach(row => {
+    const id = row.id.split('_')[1];
+    selectedMethods.add(document.getElementById('paymethod_' + id).value);
+  });
+  const matches = PAYMENT_QR_CODES.filter(qr => selectedMethods.has(qr.method));
+  const panel = document.getElementById('qrCodePanel');
+  const cards = document.getElementById('qrCodeCards');
+  if (matches.length === 0) {
+    panel.style.display = 'none';
+    cards.innerHTML = '';
+    return;
+  }
+  panel.style.display = '';
+  cards.innerHTML = matches.map(qr => `
+    <div class="border rounded p-2 text-center" style="width:150px;">
+      <img src="/static/uploads/${qr.path}" class="img-fluid mb-1" style="max-height:130px;">
+      <div class="small">${qr.label}</div>
+    </div>
+  `).join('');
+}
 
 function toggleRefRequired(id) {
   const method = document.getElementById('paymethod_' + id).value;
@@ -243,6 +280,7 @@ function toggleRefRequired(id) {
     refInput.value = '';
   }
   updateProofFileVisibility();
+  updateQrDisplay();
 }
 
 function anyPaymentNeedsProof() {
@@ -312,6 +350,7 @@ function resetSaleForm() {
   document.getElementById('discountValueLabel').innerText = 'Discount Value (%)';
   document.getElementById('paymentRows').innerHTML = '';
   addPaymentRow();
+  updateQrDisplay();
   document.getElementById('proofFile').value = '';
   document.getElementById('customerName').value = '';
   document.getElementById('isWalkin').checked = false;

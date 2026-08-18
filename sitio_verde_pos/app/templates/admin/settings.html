@@ -2,12 +2,44 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h4 class="fw-bold mb-3">System Settings</h4>
-<div class="card p-4" style="max-width:600px;">
-<form method="POST">
+<div class="card p-4 mb-3" style="max-width:600px;">
+<form method="POST" enctype="multipart/form-data">
   <label class="form-label">Restaurant Name</label>
   <input type="text" name="restaurant_name" class="form-control mb-2" value="{{ settings.get('restaurant_name', 'Sitio Verde Buffet Restaurant') }}">
   <label class="form-label">Receipt Footer Message</label>
-  <input type="text" name="receipt_footer" class="form-control mb-2" value="{{ settings.get('receipt_footer', 'Thank you for dining with us!') }}">
+  <input type="text" name="receipt_footer" class="form-control mb-3" value="{{ settings.get('receipt_footer', 'Thank you for dining with us!') }}">
+
+  <hr>
+  <h6 class="fw-bold">Payment QR Codes <span class="text-muted small">(shown at checkout for GCash / Bank Transfer)</span></h6>
+
+  <div class="row g-3 mb-2">
+    <div class="col-md-4">
+      <label class="form-label small mb-1">GCash</label>
+      {% if settings.get('payment_qr_gcash') %}
+        <img src="{{ url_for('static', filename='uploads/' + settings.get('payment_qr_gcash')) }}" class="img-fluid rounded border mb-1" style="max-height:140px;">
+      {% endif %}
+      <input type="text" name="payment_qr_gcash_label" class="form-control form-control-sm mb-1" placeholder="Label (e.g. GCash - LA****E S.)" value="{{ settings.get('payment_qr_gcash_label', '') }}">
+      <input type="file" name="payment_qr_gcash" accept="image/*" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1">AUB InstaPay</label>
+      {% if settings.get('payment_qr_aub') %}
+        <img src="{{ url_for('static', filename='uploads/' + settings.get('payment_qr_aub')) }}" class="img-fluid rounded border mb-1" style="max-height:140px;">
+      {% endif %}
+      <input type="text" name="payment_qr_aub_label" class="form-control form-control-sm mb-1" placeholder="Label (e.g. SitioVerde QC - AUB)" value="{{ settings.get('payment_qr_aub_label', '') }}">
+      <input type="file" name="payment_qr_aub" accept="image/*" class="form-control form-control-sm">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small mb-1">PSBank InstaPay</label>
+      {% if settings.get('payment_qr_psbank') %}
+        <img src="{{ url_for('static', filename='uploads/' + settings.get('payment_qr_psbank')) }}" class="img-fluid rounded border mb-1" style="max-height:140px;">
+      {% endif %}
+      <input type="text" name="payment_qr_psbank_label" class="form-control form-control-sm mb-1" placeholder="Label (e.g. PSBank - J S)" value="{{ settings.get('payment_qr_psbank_label', '') }}">
+      <input type="file" name="payment_qr_psbank" accept="image/*" class="form-control form-control-sm">
+    </div>
+  </div>
+  <div class="form-text mb-3">Uploading a new image replaces the current one for that method. Leave the file field empty to keep what's already saved.</div>
+
   <button class="btn btn-sv">Save Settings</button>
 </form>
 </div>

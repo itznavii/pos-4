@@ -228,6 +228,24 @@ def settings():
                 setting.value = value
             else:
                 db.session.add(Setting(key=key, value=value))
+
+        # Payment QR codes (GCash / Bank Transfer) shown to customers at
+        # checkout. A blank file input means "keep the current one" — only
+        # overwrite when the admin actually uploads a replacement.
+        for qr_key in ("payment_qr_gcash", "payment_qr_aub", "payment_qr_psbank"):
+            file_storage = request.files.get(qr_key)
+            if file_storage and file_storage.filename:
+                try:
+                    saved_path = save_upload(file_storage, subfolder="payment_qr")
+                except ValueError as e:
+                    flash(str(e), "danger")
+                    continue
+                setting = Setting.query.filter_by(key=qr_key).first()
+                if setting:
+                    setting.value = saved_path
+                else:
+                    db.session.add(Setting(key=qr_key, value=saved_path))
+
         db.session.commit()
         log_activity("Updated system settings")
         flash("Settings saved.", "success")

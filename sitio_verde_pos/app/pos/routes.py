@@ -15,6 +15,7 @@ from app.models import (
     RestaurantTable,
     Customer,
     InventoryTransaction,
+    Setting,
 )
 from app.utils import (
     new_sale_number,
@@ -30,7 +31,9 @@ from app.notifications.helpers import notify
 pos = Blueprint("pos", __name__)
 
 SENIOR_PWD_RATE = 0.20
-METHODS_REQUIRING_REFERENCE = {"gcash"}
+# Kept consistent with the reservations final-billing flow, which also
+# requires a reference number for both GCash and Bank Transfer.
+METHODS_REQUIRING_REFERENCE = {"gcash", "bank transfer"}
 
 
 @pos.route("/")
@@ -38,7 +41,19 @@ METHODS_REQUIRING_REFERENCE = {"gcash"}
 def index():
     buffet_products = Product.query.filter_by(available=True, is_buffet=True).all()
     tables = RestaurantTable.query.order_by(RestaurantTable.name).all()
-    return render_template("pos/index.html", buffet_products=buffet_products, tables=tables)
+    settings = {s.key: s.value for s in Setting.query.all()}
+    payment_qr_codes = [
+        {"method": "GCash", "path": settings.get("payment_qr_gcash"), "label": settings.get("payment_qr_gcash_label", "GCash")},
+        {"method": "Bank Transfer", "path": settings.get("payment_qr_aub"), "label": settings.get("payment_qr_aub_label", "AUB InstaPay")},
+        {"method": "Bank Transfer", "path": settings.get("payment_qr_psbank"), "label": settings.get("payment_qr_psbank_label", "PSBank InstaPay")},
+    ]
+    payment_qr_codes = [qr for qr in payment_qr_codes if qr["path"]]
+    return render_template(
+        "pos/index.html",
+        buffet_products=buffet_products,
+        tables=tables,
+        payment_qr_codes=payment_qr_codes,
+    )
 
 
 @pos.route("/api/buffet-products")
