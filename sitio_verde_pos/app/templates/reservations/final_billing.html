@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Final Billing{% endblock %}
+{% block content %}
+<h4 class="fw-bold mb-3">Final Billing - {{ r.reservation_number }}</h4>
+<div class="card p-4" style="max-width:600px;">
+  <div class="table-responsive">
+<table class="table table-sm">
+    <tr><th>Reserved Guests</th><td>{{ r.pax }}</td></tr>
+    <tr><th>Actual Guests</th><td>{{ r.actual_pax or r.pax }}</td></tr>
+    <tr><th>Verified Down Payment</th><td>₱{{ '%.2f'|format(verified_dp) }}</td></tr>
+  </table>
+</div>
+  <form method="POST" id="billingForm">
+    <label class="form-label">Total Bill <span class="text-muted">(grand total for all {{ r.actual_pax or r.pax }} guests — NOT the per-guest price)</span></label>
+    <input type="number" step="0.01" name="total_bill" id="totalBill" class="form-control mb-2" required oninput="recalc()">
+    <div class="form-text mb-2">≈ ₱<span id="perGuestDisplay">0.00</span> per guest at this total</div>
+    <div class="alert alert-info small">Remaining Balance: ₱<span id="remainingDisplay">0.00</span></div>
+
+    <label class="form-label">Final Payment Method</label>
+    <select name="payment_method" id="paymentMethod" class="form-select mb-2" onchange="toggleCashTendered()">
+      <option>Cash</option><option>GCash</option><option>Bank Transfer</option><option>Credit Card</option><option>Mixed Payment</option>
+    </select>
+    <label class="form-label">Amount Paid</label>
+    <input type="number" step="0.01" name="amount_paid" id="amountPaid" class="form-control mb-2" required oninput="recalc()">
+
+    <div id="cashTenderedGroup" class="mb-2" style="display:none;">
+      <label class="form-label">Cash Tendered</label>
+      <input type="number" step="0.01" name="cash_tendered" id="cashTendered" class="form-control" oninput="recalc()">
+      <div class="form-text">Change: ₱<span id="changeDisplay">0.00</span></div>
+    </div>
+
+    <label class="form-label">Reference Number (if applicable)</label>
+    <input type="text" name="reference_number" class="form-control mb-3">
+
+    <button class="btn btn-sv w-100">Complete &amp; Generate Receipt</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const verifiedDp = {{ verified_dp }};
+const pax = {{ r.actual_pax or r.pax or 1 }};
+function recalc() {
+  const total = parseFloat(document.getElementById('totalBill').value || 0);
+  const remaining = Math.max(0, total - verifiedDp);
+  document.getElementById('remainingDisplay').innerText = remaining.toFixed(2);
+  document.getElementById('perGuestDisplay').innerText = (pax > 0 ? total / pax : 0).toFixed(2);
+
+  const amountPaid = parseFloat(document.getElementById('amountPaid').value || 0);
+  const cashTendered = parseFloat(document.getElementById('cashTendered').value || 0);
+  const change = Math.max(0, cashTendered - amountPaid);
+  document.getElementById('changeDisplay').innerText = change.toFixed(2);
+}
+function toggleCashTendered() {
+  const method = document.getElementById('paymentMethod').value;
+  const group = document.getElementById('cashTenderedGroup');
+  const cashTenderedInput = document.getElementById('cashTendered');
+  if (method === 'Cash') {
+    group.style.display = 'block';
+    cashTenderedInput.required = true;
+  } else {
+    group.style.display = 'none';
+    cashTenderedInput.required = false;
+    cashTenderedInput.value = '';
+  }
+}
+toggleCashTendered();
+</script>
+{% endblock %}
